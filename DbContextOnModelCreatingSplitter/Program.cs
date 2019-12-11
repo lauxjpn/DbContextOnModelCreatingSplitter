@@ -5,7 +5,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using CommandLine;
 
-namespace DbContextOnConfiguringSplitter
+namespace DbContextOnModelCreatingSplitter
 {
     public class Options
     {
