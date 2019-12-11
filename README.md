@@ -19,7 +19,7 @@ This tool can be used as a workaround for https://github.com/aspnet/EntityFramew
 ```
 
 ### Example
-`DbContextOnConfiguringSplitter -c "Data\MyContext.cs" -o "Data\Configurations" -n "MyNamespace.Data.Configurations"`
+`DbContextOnConfiguringSplitter -c Data\MyContext.cs -o Data\Configurations -n MyNamespace.Data.Configurations`
 
 ### Note
 A backup file of the original DbContext file is created by default.
