@@ -1,4 +1,4 @@
-# DbContextOnConfiguringSplitter
+# DbContext OnConfiguring Splitter
 Command line tool that splits FluentAPI entity definitions from `DbContext.OnConfiguring()` into separate configuration files.
 
 This tool can be used as a workaround for https://github.com/aspnet/EntityFrameworkCore/issues/8434.
