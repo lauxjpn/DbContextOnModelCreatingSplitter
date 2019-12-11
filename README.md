@@ -26,5 +26,8 @@ DbContextOnModelCreatingSplitter -c Data\MyContext.cs -o Data\Configurations -n 
 ### Note
 A backup of the original DbContext file is created by default.
 
+### Download
+You can [download](https://github.com/lauxjpn/DbContextOnModelCreatingSplitter/releases/download/v1.0.0/DbContextOnModelCreatingSplitter_1.0.0.zip) the binaries from the latest [release](https://github.com/lauxjpn/DbContextOnModelCreatingSplitter/releases). 
+
 ### License
 [MIT](https://github.com/lauxjpn/DbContextOnConfiguringSplitter/blob/master/LICENSE)
