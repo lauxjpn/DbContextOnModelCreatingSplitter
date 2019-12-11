@@ -4,6 +4,7 @@ Command line tool that splits FluentAPI entity definitions from `DbContext.OnCon
 This tool can be used as a workaround for https://github.com/aspnet/EntityFrameworkCore/issues/8434.
 
 ### Usage
+```
   -c, --dbcontext    Required. Path the the DbContext file
 
   -o, --outdir       Output path for the generated configuration files
@@ -15,6 +16,7 @@ This tool can be used as a workaround for https://github.com/aspnet/EntityFramew
   --help             Display this help screen.
 
   --version          Display version information.
+```
 
 ### Example
 `DbContextOnConfiguringSplitter -c "Data\MyContext.cs" -o "Data\Configurations" -n "MyNamespace.Data.Configurations"`
