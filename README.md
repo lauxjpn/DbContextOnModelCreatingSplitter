@@ -24,7 +24,7 @@ DbContextOnConfiguringSplitter -c Data\MyContext.cs -o Data\Configurations -n My
 ```
 
 ### Note
-A backup file of the original DbContext file is created by default.
+A backup of the original DbContext file is created by default.
 
 ### License
 [MIT](https://github.com/lauxjpn/DbContextOnConfiguringSplitter/blob/master/LICENSE)
