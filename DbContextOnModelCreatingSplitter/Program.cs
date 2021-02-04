@@ -65,6 +65,8 @@ namespace DbContextOnModelCreatingSplitter
                     .TrimStart('\r', '\n', '\t', ' ')
                     .Replace(new string(' ', 16), new string(' ', 12));
 
+                string suffix = options.Suffix ?? "Configuration";
+
                 var configuration = new StringBuilder();
 
                 configuration.AppendLine(string.Join(Environment.NewLine, contextUsingStatements));
@@ -73,7 +75,7 @@ namespace DbContextOnModelCreatingSplitter
                 configuration.AppendLine();
                 configuration.AppendLine($"namespace {configurationNamespace}");
                 configuration.AppendLine("{");
-                configuration.AppendLine(new string(' ', 4) + $"public class {entityName}Configuration : IEntityTypeConfiguration<{entityName}>");
+                configuration.AppendLine(new string(' ', 4) + $"public class {entityName}{suffix} : IEntityTypeConfiguration<{entityName}>");
                 configuration.AppendLine(new string(' ', 4) + "{");
                 configuration.AppendLine(new string(' ', 8) + $"public void Configure(EntityTypeBuilder<{entityName}> {entityParameterName})");
                 configuration.AppendLine(new string(' ', 8) + "{");
@@ -83,7 +85,6 @@ namespace DbContextOnModelCreatingSplitter
                 configuration.AppendLine("}");
 
                 var configurationContents = configuration.ToString();
-                string suffix = options.Suffix ?? "Configuration";
                 var configurationFilePath = Path.Combine(configurationsDirectoryPath, $"{entityName}{suffix}.cs");
 
                 Console.WriteLine(new string(' ', 4) + configurationFilePath);
