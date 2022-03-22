@@ -11,6 +11,8 @@ This tool can be used as a workaround for https://github.com/aspnet/EntityFramew
 
   -n, --namespace    Namespace for the generated configuration classes
 
+  -s, --suffix       Suffix for the generated configuration files
+  
   -B, --no-backup    Don't keep a copy of the original DbContext file
 
   --help             Display this help screen.

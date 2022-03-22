@@ -18,7 +18,7 @@ namespace DbContextOnModelCreatingSplitter
         [Option('n', "namespace", Required = false, HelpText = "Namespace for the generated configuration classes")]
         public string Namespace { get; set; }
 
-        [Option('s', "suffix", Required = false, HelpText = "Suffix for the generated configuration files")]
+        [Option('s', "suffix", Required = false, HelpText = "Suffix for the generated configuration files (Default: Configuration)")]
         public string Suffix { get; set; }
 
         [Option('B', "no-backup", Required = false, HelpText = "Don't keep a copy of the original DbContext file")]
@@ -50,7 +50,7 @@ namespace DbContextOnModelCreatingSplitter
 
             var configurationNamespace = options.Namespace ?? contextNamespace;
 
-            const string statementsInnerBlockPattern = @"(?<=modelBuilder\.Entity<(?<EntityName>.*?)>\((?<EntityParameterName>.*?)\s*=>\s*\{).*?(?=\r?\n\s*\}\);)";
+            const string statementsInnerBlockPattern = @"(?<=modelBuilder\.Entity<(?<EntityName>.*?)>\((?<EntityParameterName>.*?)\s*=>\s*\{).*?(?:;)(?=\s*\}\);)";
 
             var statementsBlockMatches = Regex.Matches(source, statementsInnerBlockPattern, RegexOptions.Multiline | RegexOptions.Singleline)
                 .ToList();
@@ -98,7 +98,7 @@ namespace DbContextOnModelCreatingSplitter
                 return;
             }
 
-            const string statementsOuterBlockPattern = @"\s*modelBuilder\.Entity<.*?>\(.*?\s*=>\s*\{.*?\r?\n\s*\}\);\r?\n";
+            const string statementsOuterBlockPattern = @"\s*modelBuilder\.Entity<.*?>\(.*?\s*=>\s*\{.*?;?.*\}\);";
 
             source = Regex.Replace(source, statementsOuterBlockPattern, string.Empty, RegexOptions.Multiline | RegexOptions.Singleline);
             if (!options.NoBackup)
