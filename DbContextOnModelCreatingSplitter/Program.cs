@@ -50,7 +50,7 @@ namespace DbContextOnModelCreatingSplitter
 
             var configurationNamespace = options.Namespace ?? contextNamespace;
 
-            const string statementsInnerBlockPattern = @"(?<=modelBuilder\.Entity<(?<EntityName>.*?)>\((?<EntityParameterName>.*?)\s*=>\s*\{).*?(?:;)(?=\s*\}\);)";
+            const string statementsInnerBlockPattern = @"(?<=modelBuilder\.Entity<(?<EntityName>.*?)>\((?<EntityParameterName>.*?)\s*=>\s*\{).*?(?=\r?\n\s*\}\);)";
 
             var statementsBlockMatches = Regex.Matches(source, statementsInnerBlockPattern, RegexOptions.Multiline | RegexOptions.Singleline)
                 .ToList();
@@ -98,7 +98,7 @@ namespace DbContextOnModelCreatingSplitter
                 return;
             }
 
-            const string statementsOuterBlockPattern = @"\s*modelBuilder\.Entity<.*?>\(.*?\s*=>\s*\{.*?;?.*\}\);";
+            const string statementsOuterBlockPattern = @"\s*modelBuilder\.Entity<.*?>\(.*?\s*=>\s*\{.*?\r?\n\s*\}\);\r?\n";
 
             source = Regex.Replace(source, statementsOuterBlockPattern, string.Empty, RegexOptions.Multiline | RegexOptions.Singleline);
             if (!options.NoBackup)
