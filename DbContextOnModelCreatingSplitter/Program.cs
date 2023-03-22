@@ -1,25 +1,22 @@
-﻿using System;
-using System.IO;
-using System.Linq;
+﻿using CommandLine;
 using System.Text;
 using System.Text.RegularExpressions;
-using CommandLine;
 
 namespace DbContextOnModelCreatingSplitter
 {
     public class Options
     {
         [Option('c', "dbcontext", Required = true, HelpText = "Path the the DbContext file")]
-        public string DbContextPath { get; set; }
+        public string DbContextPath { get; set; } = null!;
 
         [Option('o', "outdir", Required = false, HelpText = "Output path for the generated configuration files")]
-        public string OutputDirectoryPath { get; set; }
+        public string? OutputDirectoryPath { get; set; }
 
         [Option('n', "namespace", Required = false, HelpText = "Namespace for the generated configuration classes")]
-        public string Namespace { get; set; }
+        public string? Namespace { get; set; }
 
         [Option('s', "suffix", Required = false, HelpText = "Suffix for the generated configuration files (Default: Configuration)")]
-        public string Suffix { get; set; }
+        public string? Suffix { get; set; }
 
         [Option('B', "no-backup", Required = false, HelpText = "Don't keep a copy of the original DbContext file")]
         public bool NoBackup { get; set; }
@@ -36,7 +33,8 @@ namespace DbContextOnModelCreatingSplitter
         private static void Run(Options options)
         {
             var dbContextFilePath = Path.GetFullPath(options.DbContextPath);
-            var configurationsDirectoryPath = options.OutputDirectoryPath != null ? Path.GetFullPath(options.OutputDirectoryPath) : Path.GetDirectoryName(dbContextFilePath);
+            string dbContexFolder = Path.GetDirectoryName(dbContextFilePath) ?? throw new NullReferenceException();
+            var configurationsDirectoryPath = options.OutputDirectoryPath != null ? Path.GetFullPath(options.OutputDirectoryPath) : dbContexFolder;
 
             var source = File.ReadAllText(dbContextFilePath);
 
@@ -46,11 +44,12 @@ namespace DbContextOnModelCreatingSplitter
                 .Select(m => m.Value)
                 .ToList();
 
-            var contextNamespace = Regex.Match(source, @"(?<=(?:^|\s|;)namespace\s+).*?(?=(?:\s|\{))", RegexOptions.Multiline | RegexOptions.Singleline).Value;
+            string contextNamespace = Regex.Match(source, @"(?<=(?:^|\s|;)namespace\s+).*?(?=(?:\s|\{))", RegexOptions.Multiline | RegexOptions.Singleline).Value;
 
             var configurationNamespace = options.Namespace ?? contextNamespace;
 
             const string statementsInnerBlockPattern = @"(?<=modelBuilder\.Entity<(?<EntityName>.*?)>\((?<EntityParameterName>.*?)\s*=>\s*\{).*?(?:;)(?=\r?\n\s*\}\);)";
+            //const string statementsInnerBlockPattern = @"(?<=modelBuilder\.Entity<(?<EntityName>.*?)>\((?<EntityParameterName>.*?)\s*=>\s*\{).*?(?:;)(?=\s*\}\);)";
 
             var statementsBlockMatches = Regex.Matches(source, statementsInnerBlockPattern, RegexOptions.Multiline | RegexOptions.Singleline)
                 .ToList();
@@ -88,7 +87,7 @@ namespace DbContextOnModelCreatingSplitter
                 var configurationFilePath = Path.Combine(configurationsDirectoryPath, $"{entityName}{suffix}.cs");
 
                 Console.WriteLine(new string(' ', 4) + configurationFilePath);
-                
+
                 File.WriteAllText(configurationFilePath, configurationContents);
             }
 
@@ -100,12 +99,27 @@ namespace DbContextOnModelCreatingSplitter
 
             const string statementsOuterBlockPattern = @"\s*modelBuilder\.Entity<.*?>\(.*?\s*=>\s*\{.*?;?.*\}\);";
 
-            source = Regex.Replace(source, statementsOuterBlockPattern, string.Empty, RegexOptions.Multiline | RegexOptions.Singleline);
+            var netcontent = new StringBuilder();
+            netcontent.AppendLine();
+            netcontent.AppendLine();
+            foreach (var blockMatch in statementsBlockMatches)
+            {
+                var entityName = blockMatch.Groups["EntityName"].Value;
+                string suffix = options.Suffix ?? "Configuration";
+
+                netcontent.AppendLine(new string(' ', 12) + $"modelBuilder.ApplyConfiguration(new {entityName}{suffix}());");
+            }
+            var newConfigurationContents = netcontent.ToString(); //string.Empty
+
+            source = Regex.Replace(source, statementsOuterBlockPattern, newConfigurationContents, RegexOptions.Multiline | RegexOptions.Singleline);
+
+
+
             if (!options.NoBackup)
             {
                 Console.WriteLine("Backup DbContext file:");
 
-                var backupFilePath = Path.Combine(Path.GetDirectoryName(dbContextFilePath), $"{Path.GetFileName(dbContextFilePath)}.{DateTime.Now:yyyyMMddHHmmss}.bak");
+                var backupFilePath = Path.Combine(dbContexFolder, $"{Path.GetFileName(dbContextFilePath)}.{DateTime.Now:yyyyMMddHHmmss}.bak");
 
                 Console.WriteLine(new string(' ', 4) + "Original file path:" + dbContextFilePath);
                 Console.WriteLine(new string(' ', 4) + "Backup file path:" + backupFilePath);
