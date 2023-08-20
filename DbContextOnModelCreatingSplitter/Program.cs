@@ -7,108 +7,178 @@ using CommandLine;
 
 namespace DbContextOnModelCreatingSplitter
 {
-    public class Options
-    {
-        [Option('c', "dbcontext", Required = true, HelpText = "Path the the DbContext file")]
-        public string DbContextPath { get; set; }
+   public class Options
+   {
+      [Option('c', "dbcontext", Required = true, HelpText = "Path the the DbContext file")]
+      public string DbContextPath { get; set; }
 
-        [Option('o', "outdir", Required = false, HelpText = "Output path for the generated configuration files")]
-        public string OutputDirectoryPath { get; set; }
+      [Option('o', "outdir", Required = false, HelpText = "Output path for the generated configClass files")]
+      public string OutputDirectoryPath { get; set; }
 
-        [Option('n', "namespace", Required = false, HelpText = "Namespace for the generated configuration classes")]
-        public string Namespace { get; set; }
+      [Option('n', "namespace", Required = false, HelpText = "Namespace for the generated configClass classes")]
+      public string Namespace { get; set; }
 
-        [Option('B', "no-backup", Required = false, HelpText = "Don't keep a copy of the original DbContext file")]
-        public bool NoBackup { get; set; }
-    }
+      [Option('B', "no-backup", Required = false, HelpText = "Don't keep a copy of the original DbContext file")]
+      public bool NoBackup { get; set; }
 
-    class Program
-    {
-        static void Main(string[] args)
-        {
-            Parser.Default.ParseArguments<Options>(args)
-                .WithParsed(Run);
-        }
+      [Option('r', "no-replace", Default = false, Required = false, HelpText = "Don't replace OnModelCreating event code")]
+      public bool NoReplacement { get; set; }
 
-        private static void Run(Options options)
-        {
-            var dbContextFilePath = Path.GetFullPath(options.DbContextPath);
-            var configurationsDirectoryPath = options.OutputDirectoryPath != null ? Path.GetFullPath(options.OutputDirectoryPath) : Path.GetDirectoryName(dbContextFilePath);
+      [Option('e', "embed-config", Default = false, Required = false, HelpText = "Embed EntityTypeConfiguration class into entity model file")]
+      public bool EmbedConfigClass { get; set; }
+   }
 
-            var source = File.ReadAllText(dbContextFilePath);
+   class Program
+   {
+      static short _indentSizeSource = 4;
+      static short _indentSize = 4;
 
-            Directory.CreateDirectory(configurationsDirectoryPath);
+      static void Main(string[] args)
+      {
+         Parser.Default.ParseArguments<Options>(args)
+             .WithParsed(Run);
+      }
 
-            var contextUsingStatements = Regex.Matches(source, @"^using\s+.*?;", RegexOptions.Multiline | RegexOptions.Singleline)
-                .Select(m => m.Value)
-                .ToList();
+      private static void Run(Options options)
+      {
+         var dbContextFilePath = Path.GetFullPath(options.DbContextPath);
+         var configurationsDirPath = !string.IsNullOrEmpty(options.OutputDirectoryPath) ? Path.GetFullPath(options.OutputDirectoryPath) : Path.GetDirectoryName(dbContextFilePath);
 
-            var contextNamespace = Regex.Match(source, @"(?<=(?:^|\s|;)namespace\s+).*?(?=(?:\s|\{))", RegexOptions.Multiline | RegexOptions.Singleline).Value;
+         var source = File.ReadAllText(dbContextFilePath);
 
-            var configurationNamespace = options.Namespace ?? contextNamespace;
+         Directory.CreateDirectory(configurationsDirPath);
 
-            const string statementsInnerBlockPattern = @"(?<=modelBuilder\.Entity<(?<EntityName>.*?)>\((?<EntityParameterName>.*?)\s*=>\s*\{).*?(?=\r?\n\s*\}\);)";
+         var contextUsingStatements = Regex.Matches(source, @"^using\s+.*?;", RegexOptions.Multiline | RegexOptions.Singleline)
+             .Select(m => m.Value)
+             .ToList();
 
-            var statementsBlockMatches = Regex.Matches(source, statementsInnerBlockPattern, RegexOptions.Multiline | RegexOptions.Singleline)
-                .ToList();
+         var contextNamespace = Regex.Match(source,
+                                            @"(?<=(?:^|\s|;)namespace\s+).*?(?=(?:;|\s|\{))",
+                                            RegexOptions.Multiline | RegexOptions.Singleline).Value;
 
-            Console.WriteLine("Create configuration files:");
+         var configurationNamespace = options.Namespace ?? contextNamespace;
 
-            foreach (var blockMatch in statementsBlockMatches)
+         Console.WriteLine("Create configClass files:");
+
+         string modelsBackupDirPath = "";
+         if (!options.NoBackup & options.EmbedConfigClass)
+         {
+            var modelsBackupDir = $"_backup_{DateTime.Now:yyyyMMddHHmmss}";
+            modelsBackupDirPath = Path.Combine(configurationsDirPath, modelsBackupDir);
+            Directory.CreateDirectory(modelsBackupDirPath);
+         }
+
+         const string statementsOuterBlockPattern = @"\s*modelBuilder\.Entity<.*?>\(.*?\s*=>\s*\{.*?\r?\n\s*\}\);\r?\n";
+         const string statementsInnerBlockPattern = @"(?<=modelBuilder\.Entity<(?<EntityName>.*?)>\((?<EntityParameterName>.*?)\s*=>\s*\{\r?\n).*?(?=\r?\n\s*\}\);)";
+
+         var statementsBlockMatches = Regex.Matches(source, statementsOuterBlockPattern, RegexOptions.Multiline | RegexOptions.Singleline).ToList();
+
+         foreach (var blockMatch in statementsBlockMatches)
+         {
+            var innerBlock = Regex.Match(blockMatch.Value, statementsInnerBlockPattern, RegexOptions.Multiline | RegexOptions.Singleline);
+
+            var entityMaybeFullName = innerBlock.Groups["EntityName"].Value;
+            var entityName = entityMaybeFullName.Substring(entityMaybeFullName.LastIndexOf('.') + 1);
+            var entityParameterName = innerBlock.Groups["EntityParameterName"].Value;
+
+            var statements = innerBlock.Value;
+            var indentAtStatementsFirstLine = Regex.Match(statements, @"^\s+").Value;
+
+            short tabs = 0;
+            if (!options.EmbedConfigClass)
+               tabs = 1;
+
+            var configClass = new StringBuilder();
+            configClass.AppendLine(Tab(tabs) + $"public class {entityName}Configuration : IEntityTypeConfiguration<{entityMaybeFullName}>");
+            configClass.AppendLine(Tab(tabs) + "{");
+            tabs++;
+            configClass.AppendLine(Tab(tabs) + $"public void Configure(EntityTypeBuilder<{entityMaybeFullName}> {entityParameterName})");
+            configClass.AppendLine(Tab(tabs) + "{");
+            tabs++;
+            configClass.AppendLine(statements.Replace(indentAtStatementsFirstLine, Tab(tabs)));
+            tabs--;
+            configClass.AppendLine(Tab(tabs) + "}");
+            tabs--;
+            configClass.AppendLine(Tab(tabs) + "}");
+
+            string configurationFilePath;
+            if (options.EmbedConfigClass)
             {
-                var entityName = blockMatch.Groups["EntityName"].Value;
-                var entityParameterName = blockMatch.Groups["EntityParameterName"].Value;
-                var statements = Regex.Replace(blockMatch.Value, @"^\t+", new string(' ', 4), RegexOptions.Multiline)
-                    .TrimStart('\r', '\n', '\t', ' ')
-                    .Replace(new string(' ', 16), new string(' ', 12));
+               configurationFilePath = Path.Combine(configurationsDirPath, $"{entityName}.cs");
+               var modelContents = File.ReadAllText(configurationFilePath);
 
-                var configuration = new StringBuilder();
+               var usingBlockMatches = Regex.Matches(modelContents, "^using .*?;\r?\n", RegexOptions.Multiline | RegexOptions.Singleline);
+               var lastUsingLine = usingBlockMatches.Last().Value;
+               var modifiedUsingBlock = lastUsingLine +
+                                        "using Microsoft.EntityFrameworkCore;" + Environment.NewLine +
+                                        "using Microsoft.EntityFrameworkCore.Metadata.Builders;" + Environment.NewLine;
+               modelContents = modelContents.Replace(lastUsingLine, modifiedUsingBlock);
+               modelContents += Environment.NewLine + configClass.ToString();
 
-                configuration.AppendLine(string.Join(Environment.NewLine, contextUsingStatements));
-                configuration.AppendLine("using Microsoft.EntityFrameworkCore.Metadata.Builders;");
-                configuration.AppendLine($"using {contextNamespace};");
-                configuration.AppendLine();
-                configuration.AppendLine($"namespace {configurationNamespace}");
-                configuration.AppendLine("{");
-                configuration.AppendLine(new string(' ', 4) + $"public class {entityName}Configuration : IEntityTypeConfiguration<{entityName}>");
-                configuration.AppendLine(new string(' ', 4) + "{");
-                configuration.AppendLine(new string(' ', 8) + $"public void Configure(EntityTypeBuilder<{entityName}> {entityParameterName})");
-                configuration.AppendLine(new string(' ', 8) + "{");
-                configuration.AppendLine(new string(' ', 12) + statements);
-                configuration.AppendLine(new string(' ', 8) + "}");
-                configuration.AppendLine(new string(' ', 4) + "}");
-                configuration.AppendLine("}");
+               if (!options.NoBackup)
+               {
+                  var backupFilePath = Path.Combine(modelsBackupDirPath, Path.GetFileName(configurationFilePath));
+                  File.Copy(configurationFilePath, backupFilePath, true);
+               }
 
-                var configurationContents = configuration.ToString();
-                var configurationFilePath = Path.Combine(configurationsDirectoryPath, $"{entityName}Configuration.cs");
+               File.WriteAllText(configurationFilePath, modelContents);
+            }
+            else
+            {
+               var configFile = new StringBuilder();
+               configFile.AppendLine(string.Join(Environment.NewLine, contextUsingStatements));
+               configFile.AppendLine("using Microsoft.EntityFrameworkCore.Metadata.Builders;");
+               configFile.AppendLine($"using {contextNamespace};");
+               configFile.AppendLine();
+               configFile.AppendLine($"namespace {configurationNamespace}");
+               configFile.AppendLine("{");
+               configFile.AppendLine(configClass.ToString());
+               configFile.AppendLine("}");
 
-                Console.WriteLine(new string(' ', 4) + configurationFilePath);
-                
-                File.WriteAllText(configurationFilePath, configurationContents);
+               configurationFilePath = Path.Combine(configurationsDirPath, $"{entityName}Configuration.cs");
+               File.WriteAllText(configurationFilePath, configFile.ToString());
             }
 
-            if (!statementsBlockMatches.Any())
-            {
-                Console.WriteLine(new string(' ', 4) + "No entity definitions found.");
-                return;
-            }
+            Console.WriteLine(TabSrc(1) + configurationFilePath);
 
-            const string statementsOuterBlockPattern = @"\s*modelBuilder\.Entity<.*?>\(.*?\s*=>\s*\{.*?\r?\n\s*\}\);\r?\n";
+            string srcEntityConfigLine = "";
+            if (!options.NoReplacement)
+               srcEntityConfigLine = Environment.NewLine + TabSrc(2) +
+                                     $"new {entityName}Configuration().Configure(modelBuilder.Entity<{entityMaybeFullName}>());";
+            source = source.Replace(blockMatch.Value, srcEntityConfigLine);
+         }
 
-            source = Regex.Replace(source, statementsOuterBlockPattern, string.Empty, RegexOptions.Multiline | RegexOptions.Singleline);
-            if (!options.NoBackup)
-            {
-                Console.WriteLine("Backup DbContext file:");
+         if (!statementsBlockMatches.Any())
+         {
+            Console.WriteLine(TabSrc(1) + "No entity definitions found.");
+            return;
+         }
 
-                var backupFilePath = Path.Combine(Path.GetDirectoryName(dbContextFilePath), $"{Path.GetFileName(dbContextFilePath)}.{DateTime.Now:yyyyMMddHHmmss}.bak");
+         if (!options.NoBackup)
+         {
+            if (options.EmbedConfigClass)
+               Console.WriteLine($"Backup models files saved at: {modelsBackupDirPath}");
+            Console.WriteLine();
 
-                Console.WriteLine(new string(' ', 4) + "Original file path:" + dbContextFilePath);
-                Console.WriteLine(new string(' ', 4) + "Backup file path:" + backupFilePath);
+            var backupFilePath = Path.Combine(Path.GetDirectoryName(dbContextFilePath), $"{Path.GetFileName(dbContextFilePath)}.{DateTime.Now:yyyyMMddHHmmss}.bak");
+            Console.WriteLine("Backup DbContext file:");
+            Console.WriteLine(TabSrc(1) + $"Original file path: {dbContextFilePath}");
+            Console.WriteLine(TabSrc(1) + $"Backup file path: {backupFilePath}");
+            File.Copy(dbContextFilePath, backupFilePath, true);
+         }
 
-                File.Copy(dbContextFilePath, backupFilePath, true);
-            }
+         File.WriteAllText(dbContextFilePath, source);
+      }
 
-            File.WriteAllText(dbContextFilePath, source);
-        }
-    }
+      private static string TabSrc(short tabsNumber)
+      {
+         return new string(' ', _indentSizeSource * tabsNumber); ;
+      }
+
+      private static string Tab(short tabsNumber)
+      {
+         return new string(' ', _indentSize * tabsNumber); ;
+      }
+
+   }
 }
