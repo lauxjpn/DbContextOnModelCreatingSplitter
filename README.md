@@ -1,4 +1,4 @@
-# what's different about this fork:
+# What's different about this fork:
 ### Fixes:
  - The using statement for contextNamespace had two semicolons at the end of line.
  - The modelBuilder not capture all lambda.
@@ -25,6 +25,10 @@ This tool can be used as a workaround for https://github.com/aspnet/EntityFramew
   -s, --suffix       Suffix for the generated configuration files
   
   -B, --no-backup    Don't keep a copy of the original DbContext file
+  
+  -r, --no-replace   Don't replace OnModelCreating event code
+ 
+  -e, --embed-config Embed EntityTypeConfiguration class into entity model file
 
   --help             Display this help screen.
 
