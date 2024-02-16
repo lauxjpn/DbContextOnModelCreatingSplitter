@@ -1,3 +1,14 @@
+# what's different about this fork:
+### Fixes:
+ - The using statement for contextNamespace had two semicolons at the end of line.
+ - The modelBuilder not capture all lambda.
+
+### News:
+ - Suffix for the generated configuration files, by using the 'suffix' option at command-line ('-s').
+ - Code that invokes configuration class is inserted at OnModelCreating event, but can be ignored by 'no-replace' option at command-line ('-r').
+ - The configuration class can now be embedded into entity model file, by using the 'embed-config' option at command-line ('-e').
+---
+
 # DbContext OnModelCreating Splitter
 Command line tool that splits FluentAPI entity definitions from `DbContext.OnModelCreating()` into separate configuration files.
 
